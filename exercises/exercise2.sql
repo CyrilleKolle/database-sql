@@ -172,17 +172,22 @@ Region
 --     Region;
 
 
---f) Från tabellen ”Airports”, gruppera per land och ta ut kolumner som visar: land, antal flygplatser (IATA-koder), 
---antal som saknar ICAO-kod, samt hur många procent av flygplatserna i varje land som saknar ICAO-kod.
+-- f) Från tabellen ”Airports”, gruppera per land och ta ut kolumner som visar: land, antal flygplatser (IATA-koder), 
+-- antal som saknar ICAO-kod, samt hur många procent av flygplatserna i varje land som saknar ICAO-kod.
 
--- select * from Airports
+select * from Airports
 
--- select * into Air2 from Airports
+select * into Air2 from Airports
 
--- ALTER TABLE Air2 ADD Country nvarchar(max);
--- select * from Air2
--- --select trim(',' from reverse(substring(reverse([Location served]), 1, PATINDEX('%,%', reverse([Location served]))))) from Air2
--- UPDATE Air2 SET Country =reverse(substring(reverse([Location served]), 1, PATINDEX('%,%', reverse([Location served]))));
+select trim('' from ' Canada') -- remove a no breaking space nb&p
+select trim(char(160) from ' Canada') --if the trim function cant get the right space then we check the ascii code of the space
+select trim(concat(char(160), char(32)) from ' Canada')
+select ascii(' ') --get the right ascii code for the space type
+
+ALTER TABLE Air2 ADD Country nvarchar(max);
+select * from Air2
+--select trim(',' from reverse(substring(reverse([Location served]), 1, PATINDEX('%,%', reverse([Location served]))))) from Air2
+UPDATE Air2 SET Country =reverse(substring(reverse([Location served]), 1, PATINDEX('%,%', reverse([Location served]))));
 
 
--- select country, count(IATA) from Air2 group by country
+select country, count(IATA) from Air2 group by country

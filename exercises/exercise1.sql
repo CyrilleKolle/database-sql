@@ -79,5 +79,17 @@ select * from colors2
 select [Name], Code, concat('#', format(Red, 'X2'), format(Green, 'X2'), format(Blue, 'X2')) as 'Code2' from Colors
 
 
---7
-                                                                                     
+--7f) Kopiera tabellen Colors till Colors2, men skippa kolumnen ”Code”. 
+--Gör sedan en select från Colors2 som ger samma resultat som du skulle fått från select
+-- * from Colors; (Dvs, återskapa den saknade kolumnen från RGB- värdena i resultatet).
+
+
+--1g                                                                                  
+select 
+    Integer / 100.0 as 'newInteger',
+    CAST(Integer AS FLOAT) / 100 AS 'Float',
+    String,
+    -- NOTE: have to add DAY Integer - 1 because 2019-01-00 is not a valid date
+    CAST(DATEADD(DAY, [Integer] - 1, DATEADD(MINUTE, [Integer], '2019-01-01 09:00:00')) AS DATETIME2) AS 'newDateTime',
+    Integer % 2 AS 'Bool'
+from Types
