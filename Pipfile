@@ -9,6 +9,8 @@ pandas = "*"
 pyodbc = "*"
 keyboard = "*"
 blessings = "*"
+readchar = "*"
+tabulate = "*"
 
 [dev-packages]
 ipykernel = "*"

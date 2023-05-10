@@ -28,7 +28,7 @@ select datepart(WEEKDAY, getdate());
 -- Ta ut del av datetime som int
 select datetrunc(MINUTE, getdate());
 -- Trunkerar med angiven precision
---year, month, week, day, hour, minute, second, millisecond
+--year, month, week, day, hour, minute, second, millisecond.
 --dayofyear, quarter, weekday
 
 -- Math function
