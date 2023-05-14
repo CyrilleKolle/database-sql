@@ -42,31 +42,22 @@ create table inventory
 )
 
 
-create table BookDescription
-(
-    descriptionId int primary key identity,
-    isbnBookId nvarchar(50),
-    description nvarchar(max),
-    constraint FK_book foreign key (isbnBookId) references books(isbn13)
-)
 
-create table Publisher
-(
-    publisherId int primary key identity,
-    isbnBookId nvarchar(50),
+CREATE TABLE Publisher (
+    publisherId int,
     publisherName nvarchar(50),
-    constraint FK_book_publisher foreign key (isbnBookId )references books(isbn13)
-)
-
-create table Genre
-(
-    genereId int primary key identity,
-    genereName nvarchar(50),
     isbnBookId nvarchar(50),
-)
-select * from Publisher
--- EXEC sp_rename 'dbo.genre.genereName', 'isbnBookId', 'COLUMN';
--- EXEC sp_rename 'dbo.genre.isbnBookId', 'genreName', 'COLUMN';
+    CONSTRAINT PK_NewPublisher PRIMARY KEY (publisherId, publisherName),
+    CONSTRAINT FK_publisher_book FOREIGN KEY (isbnBookId) REFERENCES books(isbn13)
+);
+
+CREATE TABLE Genre (
+    genreId int,
+    genreName nvarchar(50),
+    isbnBookId nvarchar(50),
+    CONSTRAINT PK_genre PRIMARY KEY (genreId, genreName),
+    CONSTRAINT FK_book_genre FOREIGN KEY (isbnBookId) REFERENCES books(isbn13)
+);
 
 
 create table Orders
@@ -81,29 +72,60 @@ create table Orders
     constraint CK_orders_dates check (shippedDate > orderDate)
 )
 
+create table customerOrders (
+    orderId int primary key,
+    orderDetailId int,
+    customerId int,
+    orderDate date,
+    shippedDate date,
+    shippedAddress nvarchar(100),
+    shippedCity nvarchar(100),
+    shippedPostalCode nvarchar(100)
+)
+
+create table orderDetails(
+    orderDetailId int primary key,
+    orderId int,
+    isbnBookId nvarchar(50),
+    unitPrice float,
+    quantity float,
+    constraint FK_order_books foreign key (isbnBookId) references books(isbn13)
+)
+
+create table customerDetails(
+    customerId int primary key,
+    orderId int,
+    shippedAddress nvarchar(100),
+    shippedCity nvarchar(100),
+    shippedPostalCode nvarchar(100),
+    phoneNumber nvarchar(50),
+    email nvarchar(100),
+    constraint FK_customer_order foreign key (orderId) references customerOrders(orderId)
+)
 
 GO
 create view titlePerAuthor
 as
     select
         concat(a.firstname,' ', a.lastname) as 'Name',
-        CASE 
-        WHEN a.deathdate IS NULL THEN DATEDIFF(YEAR, birthdate, GETDATE())
-        ELSE DATEDIFF(YEAR, birthdate, a.deathdate)
-    END AS 'Age',
+        case 
+        when a.deathdate is null then DATEDIFF(year, birthdate, GETDATE())
+        else DATEDIFF(year, birthdate, a.deathdate)
+    end as 'Age',
         sum(i.totalAvailable) as 'Inventory Total',
         concat(count(distinct b.isbn13), ' st') as 'Books Titles',
         concat(sum(i.totalAvailable * b.price_$), ' Kr') as 'Price value'
     from
         ai22.dbo.authors a
-        join dbo.books b on b.authorId = a.id
+        join dbo.author_books ab on ab.authorId = a.id
+        join dbo.books b on b.isbn13 = ab.isbn13
         join dbo.inventory i on i.isbnBookId = b.isbn13
-
     group by 
     a.firstname, a.lastname, a.birthdate, a.deathdate
 GO
 
 
+GO
 create procedure MoveBooks
     @fromStoreId int,
     @toStoreId int,
@@ -113,57 +135,106 @@ as
 begin
     if exists (
         select *
-    from inventory
-    where storeId = @fromStoreId and isbnBookId = @isbn and totalAvailable >= @quantity)
-                    begin
+        from inventory
+        where storeId = @fromStoreId and isbnBookId = @isbn and totalAvailable >= @quantity
+    )
+    begin
         begin tran
-        update inventory set totalAvailable = totalAvailable - @quantity where storeId = @fromStoreId and isbnBookId = @isbn
+        update inventory
+        set totalAvailable = totalAvailable - @quantity
+        where storeId = @fromStoreId and isbnBookId = @isbn
+        
         if @@ROWCOUNT = 0
-                                    begin
+        begin
             rollback
             raiserror ('Failed to move books. The providing store does not have enough stock of the specified book.', 16, 1)
             return
         end
-        update inventory set totalAvailable = totalAvailable + @quantity where storeId = @toStoreId and isbnBookId = @isbn
+        if exists (
+            select *
+            from inventory
+            where storeId = @toStoreId and isbnBookId = @isbn
+        )
+        begin
+            update inventory
+            set totalAvailable = totalAvailable + @quantity
+            where storeId = @toStoreId AND isbnBookId = @isbn
+        end
+        else
+        begin
+            insert into inventory (storeId, isbnBookId, totalAvailable)
+            values (@toStoreId, @isbn, @quantity)
+        end
+        
         if @@ROWCOUNT = 0
-                                    begin
+        begin
             rollback
             raiserror ('Failed to move books. The destination store does not have the specified book in stock.', 16, 1)
             return
         end
+        
         commit
     end
-                    else
-                    begin
+    else
+    begin
         raiserror ('Failed to move books. The providing store does not have enough stock of the specified book.', 16, 1)
     end
 end
-
 GO
 
-
-GO
 create view publisherInfo
 as
-    select top 11
-        p.publisherName,
-        count(o.isbnBookId) as 'Unique Books by publisher',
-        string_agg(o.customerId, ', ') as 'Destination',
-        string_agg(bs.name, ', ') as 'Store name'
-    from
-        Publisher p
-        join Orders o on o.isbnBookId = p.isbnBookId
-        join bookStores bs on bs.id = o.storeId
-        join books b on b.isbn13 = o.isbnBookId
-    group by 
-        p.publisherName, bs.name
+select top 11
+    p.publisherName,
+    sales.Sold,
+    (sales.Revenue * sales.sold) as 'Revenue'
+from Publisher p
+join (
+    select 
+        p.isbnBookId,
+        bs.name as StoreName,
+        COUNT(distinct co.customerId) as Sold,
+        od.unitPrice as Revenue
+    from orderDetails od
+    join customerOrders co on co.orderId = od.orderId
+    join bookStores bs on bs.id = co.storeId
+    join books b on b.isbn13 = od.isbnBookId
+    join Publisher p on p.isbnBookId = b.isbn13
+    group by p.isbnBookId, bs.name, od.unitPrice
+) sales on sales.isbnBookId = p.isbnBookId
+order by sales.Revenue desc;
 
 GO
 
+select * from orderDetails
+select * from customerDetails
+select * from customerOrders
+select * from publisher
+
+drop view publisherInfo
+select * from publisherInfo
 
 --Example:
--- EXEC MoveBooks 2, 1, '978-0062315007', 5
+-- EXEC MoveBooks 1, 3, '978-0141439518', 1
 
+select * from Publisher
 
-
-
+-- select top 11
+--     p.publisherName,
+--     sales.Sold,
+--     (sales.Revenue * sales.sold) as 'Revenue'
+-- from Publisher p
+-- join (
+--     select 
+--         p.isbnBookId,
+--         bs.name as StoreName,
+--         COUNT(distinct co.customerId) as Sold,
+--         od.unitPrice as Revenue
+--     from orderDetails od
+--     join customerOrders co on co.orderId = od.orderId
+--     join bookStores bs on bs.id = co.storeId
+--     join books b on b.isbn13 = od.isbnBookId
+--     join Publisher p on p.isbnBookId = b.isbn13
+--     group by p.isbnBookId, bs.name, od.unitPrice
+-- ) sales on sales.isbnBookId = p.isbnBookId
+-- order by sales.Revenue desc;
