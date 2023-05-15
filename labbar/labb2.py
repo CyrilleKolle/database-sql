@@ -44,8 +44,9 @@ while True:
             books b 
             join inventory i on i.isbnBookId = b.isbn13
             join bookStores bs on bs.id = i.storeId
-            join Orders o on o.isbnBookId = b.isbn13
-            join Genre g on g.isbnBookId = b.isbn13
+            join orderDetails od on od.isbnBookId = b.isbn13
+            join Orders o on o.orderId = od.orderId
+            join Genre g on g.genreId = b.genreId
         where 
             title like '%' + :title + '%'
         order by 
